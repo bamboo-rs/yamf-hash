@@ -14,7 +14,7 @@ std = ["varu64/std", "hex/std", "snafu/std"]
 [dependencies]
 arrayvec = {version = "0.5.2", default-features = false }
 blake2b_simd = { version = "0.5.11", default-features = false }
-blake3 = {version = "0.3.7", default-features = false }
+blake3 = {version = "1.2.0", default-features = false }
 hex = { version = "0.4", default-features = false }
 serde = { version = "1.0", default-features = false , features = ["derive"] }
 serde_derive = { version = "1.0", default-features = false }
