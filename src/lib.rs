@@ -18,7 +18,7 @@ pub mod error;
 use crate::util::hex_serde::{hex_from_bytes, vec_from_hex};
 use arrayvec::ArrayVec;
 use blake2b_simd::blake2b;
-use blake3::{hash, OUT_LEN as BLAKE3_OUT_LEN};
+pub use blake3::{hash as blake3, Hash as Blake3Hash, OUT_LEN as BLAKE3_OUT_LEN};
 use core::borrow::Borrow;
 use core::iter::FromIterator;
 
@@ -82,7 +82,7 @@ pub fn new_blake2b(bytes: &[u8]) -> YamfHash<ArrayVec<[u8; BLAKE2B_HASH_SIZE]>> 
 }
 
 pub fn new_blake3(bytes: &[u8]) -> YamfHash<ArrayVec<[u8; BLAKE3_HASH_SIZE]>> {
-    let hash_bytes = hash(bytes);
+    let hash_bytes = blake3(bytes);
 
     let vec_bytes: ArrayVec<[u8; BLAKE3_HASH_SIZE]> =
         ArrayVec::from_iter(hash_bytes.as_bytes().iter().map(|b| *b));
@@ -94,10 +94,19 @@ impl<'a> From<&'a YamfHash<ArrayVec<[u8; BLAKE2B_HASH_SIZE]>>> for YamfHash<&'a 
     fn from(hash: &YamfHash<ArrayVec<[u8; BLAKE2B_HASH_SIZE]>>) -> YamfHash<&[u8]> {
         match hash {
             YamfHash::Blake2b(bytes) => YamfHash::Blake2b(&bytes[..]),
+            YamfHash::Blake3(_) => panic!()
+        }
+    }
+}
+impl<'a> From<&'a YamfHash<ArrayVec<[u8; BLAKE3_HASH_SIZE]>>> for YamfHash<&'a [u8]> {
+    fn from(hash: &YamfHash<ArrayVec<[u8; BLAKE3_HASH_SIZE]>>) -> YamfHash<&[u8]> {
+        match hash {
+            YamfHash::Blake2b(_) => panic!(),
             YamfHash::Blake3(bytes) => YamfHash::Blake3(&bytes[..]),
         }
     }
 }
+
 
 impl<'a> From<blake2b_simd::Hash> for YamfHash<ArrayVec<[u8; BLAKE2B_HASH_SIZE]>> {
     fn from(hash: blake2b_simd::Hash) -> Self {
@@ -105,6 +114,14 @@ impl<'a> From<blake2b_simd::Hash> for YamfHash<ArrayVec<[u8; BLAKE2B_HASH_SIZE]>
             ArrayVec::from_iter(hash.as_bytes().iter().map(|b| *b));
 
         YamfHash::Blake2b(vec_bytes)
+    }
+}
+impl<'a> From<Blake3Hash> for YamfHash<ArrayVec<[u8; BLAKE3_HASH_SIZE]>> {
+    fn from(hash: Blake3Hash) -> Self {
+        let vec_bytes: ArrayVec<[u8; BLAKE3_HASH_SIZE]> =
+            ArrayVec::from_iter(hash.as_bytes().iter().map(|b| *b));
+
+        YamfHash::Blake3(vec_bytes)
     }
 }
 impl<T: Borrow<[u8]>> YamfHash<T> {
@@ -116,6 +133,12 @@ impl<T: Borrow<[u8]>> YamfHash<T> {
             (YamfHash::Blake2b(vec), len) if len >= encoded_size => {
                 varu64_encode(BLAKE2B_NUMERIC_ID, &mut out[0..1]);
                 varu64_encode(BLAKE2B_HASH_SIZE as u64, &mut out[1..2]);
+                out[2..encoded_size].copy_from_slice(vec.borrow());
+                Ok(encoded_size)
+            },
+            (YamfHash::Blake3(vec), len) if len >= encoded_size => {
+                varu64_encode(BLAKE3_NUMERIC_ID, &mut out[0..1]);
+                varu64_encode(BLAKE3_HASH_SIZE as u64, &mut out[1..2]);
                 out[2..encoded_size].copy_from_slice(vec.borrow());
                 Ok(encoded_size)
             }
